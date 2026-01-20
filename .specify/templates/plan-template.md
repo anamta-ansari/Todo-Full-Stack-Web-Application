@@ -31,7 +31,13 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+**Part 3 Compliance Check**:
+- [ ] Dashboard & CRUD-focused: Implement protected dashboard UI with full CRUD operations
+- [ ] Technology stack: Next.js 16+ (App Router) with Tailwind CSS, FastAPI + SQLModel + JWT
+- [ ] Project structure: Monorepo with backend/ and frontend/ directories with dashboard at /dashboard
+- [ ] Deliverables: Working dashboard UI, all 5 CRUD operations, user isolation, responsive design
+- [ ] Test-first approach: TDD enforced for all dashboard and CRUD functionality
+- [ ] Security standards: Dashboard protected, user isolation enforced, proper auth state management
 
 ## Project Structure
 

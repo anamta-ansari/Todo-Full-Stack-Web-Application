@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary-pink: #ec4899;
+  --secondary-pink: #f472b6;
+  --accent-pink: #f9a8d4;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary-pink: var(--primary-pink);
+  --color-secondary-pink: var(--secondary-pink);
+  --color-accent-pink: var(--accent-pink);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --primary-pink: #ec4899;
+    --secondary-pink: #f472b6;
+    --accent-pink: #f9a8d4;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans);
+}
+
+.bg-pink-gradient {
+  background: linear-gradient(135deg, var(--primary-pink), var(--secondary-pink));
+}
+
+.btn-primary {
+  @apply bg-pink-500 text-white px-4 py-2 rounded-lg hover:bg-pink-600 transition-colors;
+}
+
+.card {
+  @apply bg-white p-6 rounded-xl shadow-lg;
+}

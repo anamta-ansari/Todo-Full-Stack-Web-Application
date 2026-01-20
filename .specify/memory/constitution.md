@@ -1,55 +1,84 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!-- SYNC IMPACT REPORT
+Version change: 2.0.0 -> 3.0.0
+Modified principles: Principles I-VII updated to reflect Part 3 requirements
+Added sections: Principle VIII (Dashboard & CRUD Standards), Frontend Architecture Standards update
+Removed sections: None
+Templates requiring updates:
+- ✅ .specify/templates/plan-template.md - Updated to reflect new principles
+- ✅ .specify/templates/spec-template.md - Updated to reflect new principles
+- ✅ .specify/templates/tasks-template.md - Updated to reflect new principles
+- ✅ .specify/templates/commands/*.md - Verified no outdated references
+Follow-up TODOs: None
+-->
+
+# Todo Full-Stack Web Application Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Scope of Part 3
+Dashboard & CRUD-focused development: Implement protected dashboard UI with full CRUD operations; Frontend adds task management interface with add/view/update/delete/complete functionality; Backend enforces user isolation in API endpoints; UI must be responsive, beautiful, and modern with proper user experience.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Technology Stack for Part 3
+Frontend: Next.js 16+ (App Router) with Tailwind CSS for styling; Backend: Python FastAPI + SQLModel (from Part 1) with JWT verification (from Part 2); Authentication: Better Auth + JWT (from Part 2) for secure API calls; Shared secret: BETTER_AUTH_SECRET (environment variable).
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Project Structure (Post Part 3)
+Monorepo organization with dedicated backend/ and frontend/ directories; Frontend uses App Router with protected routes including dashboard; Clear separation of concerns between frontend and backend codebases; Standardized specs/ directory for documentation and planning artifacts; Dashboard UI accessible at /dashboard route after authentication.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Deliverables for Part 3 (NON-NEGOTIABLE)
+Working dashboard UI with task management functionality; All 5 CRUD operations (Add, View, Update, Delete, Mark Complete); User isolation enforced in both frontend and backend; Responsive and aesthetically pleasing UI with modern design elements; Proper authentication state management throughout the application.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Test-First Approach
+TDD mandatory: Tests written → Requirements validated → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced for all dashboard and CRUD functionality.
 
-### [PRINCIPLE_6_NAME]
+### VI. Documentation and Clarity
+All code must include appropriate docstrings; README updated with dashboard and CRUD setup and run instructions; Architecture decisions documented in specs/ directory.
 
+### VII. Security & User Isolation Standards
+- Dashboard protected: redirect to /login if not authenticated
+- Backend enforces ownership: all operations filtered by authenticated user_id
+- Frontend never displays tasks from other users
+- All API calls must include Authorization: Bearer <token>
+- Prevent cross-user data access: unauthorized requests return 401, ownership mismatches return 403
+- Frontend properly handles authentication state and redirects to login when unauthenticated
 
-[PRINCIPLE__DESCRIPTION]
+### VIII. Dashboard & CRUD Standards
+- After login, redirect to /dashboard
+- Dashboard shows only current user's tasks (GET /api/v1/tasks)
+- Add task → POST /api/v1/tasks
+- Edit task → PUT /api/v1/tasks/{id}
+- Delete task → DELETE /api/v1/tasks/{id}
+- Toggle complete → PUT /api/v1/tasks/{id} (with complete field)
+- UI must be responsive, beautiful, modern (cards, hover effects, intuitive UX)
+- Error handling with user-friendly messages
+- Loading states for better user experience
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Frontend Architecture Standards
+- Use Next.js App Router with proper route protection
+- Implement consistent authentication state management
+- Follow accessibility best practices for all UI components
+- Ensure responsive design for all pages and components
+- Handle authentication errors gracefully with user-friendly messages
+- Implement proper loading states and error boundaries
+- Use Tailwind CSS for consistent styling and modern UI components
+- Organize components logically (TaskList, AddTaskForm, EditModal, etc.)
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+## Backend Architecture Standards
+- Follow FastAPI best practices for API design
+- Use SQLModel for consistent database modeling
+- Implement proper error handling and validation
+- Follow security best practices for API endpoints including JWT verification
+- Ensure database connection pooling and optimization
+- Enforce user isolation in all data access operations
+- Maintain consistent API endpoint patterns for CRUD operations
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
-
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+## Development Workflow
+- All changes must follow the spec-plan-tasks implementation cycle
+- Code reviews required for all pull requests
+- Automated testing required before merge
+- Clear commit messages following conventional format
+- Branch naming convention: feature/[issue-number]-[short-description]
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+This constitution governs Part 3 of Phase II development: implementing the protected Todo dashboard UI and full CRUD integration with user isolation. All development activities must comply with these principles. Amendments require explicit documentation and team approval.
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
-
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 3.0.0 | **Ratified**: 2026-01-13 | **Last Amended**: 2026-01-14

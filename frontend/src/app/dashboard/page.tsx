@@ -17,13 +17,20 @@ type Task = {
   id: number;
   title: string;
   description: string;
-  completed: boolean;
+  complete: boolean;
+  priority: 'low' | 'medium' | 'high';
+  category: string;
+  due_date: string | null;
 };
 
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [category, setCategory] = useState('');
+  const [dueDate, setDueDate] = useState<string>('');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,12 +38,20 @@ export default function DashboardPage() {
   const [actionLoading, setActionLoading] = useState<number | null>(null); // Track loading state for individual actions
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+
+  // State for filters and search
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all'); // all, completed, pending
+  const [filterPriority, setFilterPriority] = useState<string>('all'); // all, high, medium, low
+  const [filterCategory, setFilterCategory] = useState<string>('all'); // all, or specific category
+  const [sortBy, setSortBy] = useState<string>('created_at'); // created_at, due_date, priority, alphabetical
+
   const router = useRouter();
   const { user, signOut, isLoading } = useAuth();
 
   // Calculate stats
   const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(task => task.completed).length;
+  const completedTasks = tasks.filter(task => task.complete).length;
   const pendingTasks = totalTasks - completedTasks;
   const overdueTasks = 0; // Placeholder - implement due date logic if needed
 
@@ -61,8 +76,18 @@ export default function DashboardPage() {
       const fetchTasks = async () => {
         try {
           setLoading(true);
-          const tasksFromApi = await getUserTasks(user.id);
+
+          // Build query parameters
+          const params = new URLSearchParams();
+          if (filterPriority !== 'all') params.append('priority', filterPriority);
+          if (filterStatus !== 'all') params.append('status', filterStatus);
+          if (filterCategory !== 'all') params.append('category', filterCategory);
+          if (searchTerm) params.append('search', searchTerm);
+          params.append('sort_by', sortBy);
+
+          const tasksFromApi = await getUserTasks(user.id, params.toString());
           setTasks(tasksFromApi);
+          setFilteredTasks(tasksFromApi);
         } catch (err) {
           setError('Failed to load tasks');
           console.error('Error loading tasks:', err);
@@ -73,7 +98,7 @@ export default function DashboardPage() {
 
       fetchTasks();
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, filterPriority, filterStatus, filterCategory, searchTerm, sortBy]);
 
   // Clear success message after 3 seconds
   useEffect(() => {
@@ -102,10 +127,23 @@ export default function DashboardPage() {
     if (!title.trim() || !user) return;
 
     try {
-      const newTask = await createUserTask(user.id, { title, description });
+      const newTask = await createUserTask(user.id, {
+        title,
+        description,
+        priority,
+        category,
+        due_date: dueDate || null
+      });
       setTasks([...tasks, newTask]);
+      setFilteredTasks([...filteredTasks, newTask]);
+
+      // Reset form
       setTitle('');
       setDescription('');
+      setPriority('medium');
+      setCategory('');
+      setDueDate('');
+
       setSuccess('Task added successfully!');
       setError(null);
     } catch (err: any) {
@@ -125,16 +163,26 @@ export default function DashboardPage() {
       setActionLoading(editingTask.id);
       const updatedTask = await updateUserTask(user.id, editingTask.id, {
         title: title,
-        description: description
+        description: description,
+        priority,
+        category,
+        due_date: dueDate || null
       });
 
       setTasks(tasks.map(task =>
         task.id === editingTask.id ? updatedTask : task
       ));
 
+      setFilteredTasks(filteredTasks.map(task =>
+        task.id === editingTask.id ? updatedTask : task
+      ));
+
       setEditingTask(null);
       setTitle('');
       setDescription('');
+      setPriority('medium');
+      setCategory('');
+      setDueDate('');
       setSuccess('Task updated successfully!');
       setError(null);
     } catch (err: any) {
@@ -184,7 +232,7 @@ export default function DashboardPage() {
       const refreshedTasks = await getUserTasks(user.id);
       setTasks(refreshedTasks);
 
-      setSuccess(updatedTask.completed ? 'Task marked as complete!' : 'Task marked as incomplete!');
+      setSuccess(updatedTask.complete ? 'Task marked as complete!' : 'Task marked as incomplete!');
       setError(null);
     } catch (err: any) {
       // If there's an error, revert the optimistic update by re-fetching
@@ -208,6 +256,9 @@ export default function DashboardPage() {
     setEditingTask(task);
     setTitle(task.title);
     setDescription(task.description || '');
+    setPriority(task.priority);
+    setCategory(task.category || '');
+    setDueDate(task.due_date || '');
   };
 
   // Cancel editing
@@ -423,13 +474,87 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             {/* Today's Tasks */}
             <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-md">
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
                 <h2 className="text-xl font-semibold text-gray-800">Today's Tasks</h2>
-                <button className="text-pink-500 hover:text-pink-700">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"></path>
-                  </svg>
-                </button>
+
+                {/* Search and Filter Controls */}
+                <div className="flex flex-wrap gap-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search tasks by title or description..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm"
+                    />
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="completed">Completed</option>
+                  </select>
+
+                  <select
+                    value={filterPriority}
+                    onChange={(e) => setFilterPriority(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm"
+                  >
+                    <option value="all">All Priorities</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+
+                  <select
+                    value={filterCategory}
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm"
+                  >
+                    <option value="all">All Categories</option>
+                    <option value="Work">Work</option>
+                    <option value="Personal">Personal</option>
+                    <option value="Health">Health</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Shopping">Shopping</option>
+                    <option value="Education">Education</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Other">Other</option>
+                  </select>
+
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm"
+                  >
+                    <option value="created_at">Sort by: Newest</option>
+                    <option value="due_date">Due Date (Ascending)</option>
+                    <option value="due_date_desc">Due Date (Descending)</option>
+                    <option value="priority">Priority</option>
+                    <option value="alphabetical">Alphabetical</option>
+                    <option value="category">Category</option>
+                  </select>
+                </div>
               </div>
 
               {loading ? (
@@ -444,29 +569,49 @@ export default function DashboardPage() {
                     <div
                       key={task.id}
                       className={`p-4 border rounded-lg flex items-start ${
-                        task.completed ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
+                        task.complete ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
                       }`}
                     >
                       <input
                         type="checkbox"
-                        checked={task.completed}
+                        checked={task.complete}
                         onChange={() => toggleComplete(task.id)}
                         className="mt-1 h-5 w-5 text-pink-600 rounded focus:ring-pink-500"
                       />
                       <div className="ml-4 flex-1">
                         <div className="flex justify-between">
-                          <h3 className={`font-medium ${task.completed ? 'line-through text-gray-500' : 'text-gray-800'}`}>
+                          <h3 className={`font-medium ${task.complete ? 'line-through text-gray-500' : 'text-gray-800'}`}>
                             {task.title}
                           </h3>
-                          <span className="text-gray-500 text-sm">10:00 AM</span>
+                          <div className="flex items-center space-x-2">
+                            {task.due_date && (
+                              <span className="text-gray-500 text-sm">
+                                {new Date(task.due_date).toLocaleDateString()}
+                              </span>
+                            )}
+                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                              task.priority === 'high' ? 'bg-red-100 text-red-800 border border-red-200' :
+                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                              'bg-green-100 text-green-800 border border-green-200'
+                            }`}>
+                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                            </span>
+                          </div>
                         </div>
-                        <p className={`${task.completed ? 'line-through text-gray-500' : 'text-gray-600'} mt-1`}>
+                        <p className={`${task.complete ? 'line-through text-gray-500' : 'text-gray-600'} mt-1`}>
                           {task.description}
                         </p>
-                        <div className="mt-2">
-                          <span className="inline-block px-2 py-1 text-xs font-semibold text-pink-700 bg-pink-100 rounded-full">
-                            {task.title.includes('Design') ? 'Design' : task.title.includes('Meeting') ? 'Meeting' : 'Personal'}
-                          </span>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {task.category && (
+                            <span className="inline-block px-2 py-1 text-xs font-semibold text-pink-700 bg-pink-100 rounded-full border border-pink-200">
+                              {task.category}
+                            </span>
+                          )}
+                          {!task.category && (
+                            <span className="inline-block px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100 rounded-full border border-gray-200">
+                              Uncategorized
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex space-x-2 ml-4">
@@ -497,7 +642,9 @@ export default function DashboardPage() {
 
             {/* Add Task Section */}
             <div className="bg-white p-6 rounded-xl shadow-md">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Add New Task</h2>
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">
+                {editingTask ? 'Edit Task' : 'Add New Task'}
+              </h2>
 
               <form onSubmit={editingTask ? handleUpdateTask : handleCreateTask}>
                 <div className="mb-4">
@@ -511,20 +658,94 @@ export default function DashboardPage() {
                   />
                 </div>
 
+                <div className="mb-4">
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    placeholder="Description (optional)"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                    <select
+                      value={priority}
+                      onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={category.startsWith('__CUSTOM__') ? '__CUSTOM__' : category}
+                        onChange={(e) => {
+                          if (e.target.value === '__CUSTOM__') {
+                            setCategory(''); // Allow user to enter custom category
+                          } else {
+                            setCategory(e.target.value);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                      >
+                        <option value="">Select Category</option>
+                        <option value="Work">Work</option>
+                        <option value="Personal">Personal</option>
+                        <option value="Health">Health</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Shopping">Shopping</option>
+                        <option value="Education">Education</option>
+                        <option value="Entertainment">Entertainment</option>
+                        <option value="Other">Other</option>
+                        <option value="__CUSTOM__">Custom Category...</option>
+                      </select>
+                      {category.startsWith('__CUSTOM__') ||
+                       (!['', 'Work', 'Personal', 'Health', 'Finance', 'Shopping', 'Education', 'Entertainment', 'Other'].includes(category)) ? (
+                        <input
+                          type="text"
+                          value={category.startsWith('__CUSTOM__') ? category.substring(9) : category}
+                          onChange={(e) => setCategory('__CUSTOM__' + e.target.value)}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                          placeholder="Enter custom category"
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Due Date (optional)</label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                  />
+                </div>
+
                 <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    className="p-2 text-gray-500 hover:text-pink-600"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                  </button>
+                  {editingTask && (
+                    <button
+                      type="button"
+                      onClick={cancelEditing}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
 
                   <button
                     type="submit"
                     disabled={actionLoading !== null}
-                    className={`px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors ${
+                    className={`px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors ml-auto ${
                       actionLoading !== null ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
@@ -582,14 +803,14 @@ export default function DashboardPage() {
                   <div
                     key={task.id}
                     className={`p-4 border rounded-lg flex justify-between items-start ${
-                      task.completed ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
+                      task.complete ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
                     }`}
                   >
                     <div>
-                      <h3 className={`text-lg font-medium ${task.completed ? 'line-through text-gray-500' : ''}`}>
+                      <h3 className={`text-lg font-medium ${task.complete ? 'line-through text-gray-500' : ''}`}>
                         {task.title}
                       </h3>
-                      <p className={`${task.completed ? 'line-through text-gray-500' : 'text-gray-600'} mt-1`}>
+                      <p className={`${task.complete ? 'line-through text-gray-500' : 'text-gray-600'} mt-1`}>
                         {task.description}
                       </p>
                     </div>
@@ -599,18 +820,18 @@ export default function DashboardPage() {
                         onClick={() => toggleComplete(task.id)}
                         disabled={actionLoading === task.id}
                         className={`p-2 rounded-full ${
-                          task.completed
+                          task.complete
                             ? 'bg-green-100 text-green-600'
                             : 'bg-gray-100 text-gray-400'
                         } ${actionLoading === task.id ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
-                        aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
+                        aria-label={task.complete ? "Mark as incomplete" : "Mark as complete"}
                       >
                         {actionLoading === task.id ? (
                           <svg className="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                        ) : task.completed ? (
+                        ) : task.complete ? (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>

@@ -38,7 +38,14 @@ export async function apiRequest<T>(
     ...options,
   };
 
-  const response = await fetch(url, config);
+  let response;
+  try {
+    response = await fetch(url, config);
+  } catch (networkError) {
+    // Handle network errors (e.g., server not reachable, CORS issues)
+    console.error(`Network error when calling ${url}:`, networkError);
+    throw new Error(`Network error: Unable to reach the server. Please make sure the backend is running on ${API_BASE_URL}.`);
+  }
 
   // Handle different response types appropriately
   if (!response.ok) {
@@ -69,8 +76,9 @@ export async function apiRequest<T>(
 /**
  * Get all tasks for a user
  */
-export async function getUserTasks(userId: number): Promise<any[]> {
-  return apiRequest(`/tasks`, {}, userId);
+export async function getUserTasks(userId: number, queryParams?: string): Promise<any[]> {
+  const queryString = queryParams ? `?${queryParams}` : '';
+  return apiRequest(`/tasks${queryString}`, {}, userId);
 }
 
 /**
@@ -78,7 +86,13 @@ export async function getUserTasks(userId: number): Promise<any[]> {
  */
 export async function createUserTask(
   userId: number,
-  taskData: { title: string; description: string }
+  taskData: {
+    title: string;
+    description: string;
+    priority: 'low' | 'medium' | 'high';
+    category: string;
+    due_date: string | null
+  }
 ): Promise<any> {
   return apiRequest(
     `/tasks`,
@@ -96,7 +110,14 @@ export async function createUserTask(
 export async function updateUserTask(
   userId: number,
   taskId: number,
-  taskData: { title?: string; description?: string; completed?: boolean }
+  taskData: {
+    title?: string;
+    description?: string;
+    completed?: boolean;
+    priority?: 'low' | 'medium' | 'high';
+    category?: string;
+    due_date?: string | null;
+  }
 ): Promise<any> {
   return apiRequest(
     `/tasks/${taskId}`,

@@ -2,7 +2,8 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session, select
-from typing import List
+from sqlalchemy import or_
+from typing import List, Optional
 from backend.models.task import Task, TaskCreate, TaskUpdate, TaskRead
 from backend.models.user import User
 from backend.db.session import get_session
@@ -17,23 +18,71 @@ router = APIRouter(tags=["tasks"])
 @router.get("/users/{user_id}/tasks", response_model=List[TaskRead])
 def get_tasks(
     user_id: int,
+    priority: Optional[str] = None,
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    sort_by: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     """
-    Get all tasks for the specified user
+    Get all tasks for the specified user with optional filters
     """
-    # Verify that the user ID in the path matches the authenticated user
-    if current_user.id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied: Cannot access tasks for another user"
-        )
+    try:
+        # Verify that the user ID in the path matches the authenticated user
+        if current_user.id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Cannot access tasks for another user"
+            )
 
-    # Only return tasks that belong to the current user
-    statement = select(Task).where(Task.user_id == current_user.id)
-    tasks = session.exec(statement).all()
-    return tasks
+        # Build the query with filters
+        statement = select(Task).where(Task.user_id == current_user.id)
+
+        # Apply filters if provided
+        if priority:
+            statement = statement.where(Task.priority == priority.lower())
+
+        if status:
+            if status.lower() == 'completed':
+                statement = statement.where(Task.complete == True)
+            elif status.lower() == 'pending':
+                statement = statement.where(Task.complete == False)
+
+        if category and category.strip():
+            # Using ilike for case-insensitive partial matching, fallback to like if not supported
+            statement = statement.where(Task.category.like(f'%{category}%'))
+
+        if search and search.strip():
+            # Using ilike for case-insensitive partial matching, fallback to like if not supported
+            statement = statement.where(
+                (Task.title.like(f'%{search}%')) | (Task.description.like(f'%{search}%'))
+            )
+
+        # Apply sorting
+        if sort_by:
+            if sort_by == 'due_date':
+                statement = statement.order_by(Task.due_date.asc().nullslast())
+            elif sort_by == 'due_date_desc':
+                statement = statement.order_by(Task.due_date.desc().nullslast())
+            elif sort_by == 'priority':
+                statement = statement.order_by(Task.priority.desc())
+            elif sort_by == 'alphabetical':
+                statement = statement.order_by(Task.title.asc())
+            elif sort_by == 'created_at':
+                statement = statement.order_by(Task.created_at.desc())
+            elif sort_by == 'category':
+                statement = statement.order_by(Task.category.asc())
+
+        tasks = session.exec(statement).all()
+        return tasks
+    except Exception as e:
+        logger.error(f"Error in get_tasks: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 @router.get("/users/{user_id}/tasks/{task_id}", response_model=TaskRead)
 def get_task(
@@ -108,6 +157,9 @@ def create_task(
             title=task.title,
             description=task.description,
             complete=task.complete,
+            priority=task.priority,
+            category=task.category,
+            due_date=task.due_date,
             user_id=current_user.id
         )
 
